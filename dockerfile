@@ -25,4 +25,4 @@ COPY --from=builder /app .
 EXPOSE 8080
 
 # Command to run the application
-CMD ["node", "run", "build"]
+CMD ["npm", "run", "build"]
