@@ -1,28 +1,29 @@
-# Stage 1: Build the application
-FROM node:20-alpine as builder
-
-# Set the working directory
+# --- Stage 1: Dependency Installation ---
+FROM node:20-alpine as deps
 WORKDIR /app
-
-# Copy package.json and package-lock.json to install dependencies
-COPY package*.json ./
-
-# Install dependencies
+COPY package.json package-lock.json ./
+# Install only production dependencies for the final image size optimization
+RUN npm install --only=production
+# Install all dependencies required for the build (including Vite)
 RUN npm install
 
-# Copy the rest of the application code
-COPY . .
-
-# Stage 2: Create a smaller production image
-FROM node:20-alpine
-
+# --- Stage 2: React Application Build ---
+FROM node:20-alpine as builder
 WORKDIR /app
+COPY . .
+# Copy dependencies from the first stage
+COPY --from=deps /app/node_modules ./node_modules
+# Execute the Vite build command (as defined in your package.json)
+RUN npm run build
 
-# Copy the necessary files from the builder stage
-COPY --from=builder /app .
+# --- Stage 3: Final Production Server (Nginx) ---
+FROM nginx:alpine
+# Copy the built static files from the 'builder' stage into Nginx's html folder
+# NOTE: Vite outputs to a directory named 'dist' by default.
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose the port the app runs on
-EXPOSE 8080
+# Nginx listens on port 80 by default
+EXPOSE 80
 
-# Command to run the application
-CMD ["npm", "run", "build"]
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]

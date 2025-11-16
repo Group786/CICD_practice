@@ -6,7 +6,9 @@ on:
       - main # Trigger on pushes to the main branch
 
 env:
-  DOCKER_IMAGE_NAME: simple-web-app # Your desired image name
+  DOCKER_IMAGE_NAME: react-web-app # Your desired image name
+  CONTAINER_PORT: 80              
+  EC2_PUBLIC_PORT: 80 
   DOCKER_REGISTRY: docker.io # Use Docker Hub
 
 jobs:
