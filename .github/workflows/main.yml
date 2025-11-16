@@ -27,7 +27,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest # Tag with latest
+          tags: fahad26/${{ env.DOCKER_IMAGE_NAME }}:latest # Tag with latest
           # Optionally add a tag with the Git commit short SHA for better versioning
           # tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
 
