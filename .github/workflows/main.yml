@@ -1,0 +1,68 @@
+name: CI/CD Pipeline to EC2
+
+on:
+  push:
+    branches:
+      - main # Trigger on pushes to the main branch
+
+env:
+  DOCKER_IMAGE_NAME: simple-web-app # Your desired image name
+  DOCKER_REGISTRY: docker.io # Use Docker Hub
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }} # GitHub Secret
+          password: ${{ secrets.DOCKER_PASSWORD }} # GitHub Secret
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest # Tag with latest
+          # Optionally add a tag with the Git commit short SHA for better versioning
+          # tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push # Ensures deployment only runs after the image is successfully pushed
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          # Your GitHub Secrets containing EC2 connection info
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          # The commands to run on the EC2 instance:
+          script: |
+            echo "Starting deployment on EC2..."
+            # 1. Log in to Docker Hub on the EC2 instance (required for private images)
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} 
+
+            # 2. Pull the newest image
+            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+
+            # 3. Stop and remove the old container (if it exists)
+            if [ "$(sudo docker ps -q -f name=${{ env.DOCKER_IMAGE_NAME }})" ]; then
+              echo "Stopping old container..."
+              sudo docker stop ${{ env.DOCKER_IMAGE_NAME }}
+              sudo docker rm ${{ env.DOCKER_IMAGE_NAME }}
+            fi
+
+            # 4. Run the new container, mapping EC2's port 80 to the container's port 8080
+            echo "Starting new container..."
+            sudo docker run -d \
+              --name ${{ env.DOCKER_IMAGE_NAME }} \
+              -p 80:8080 \
+              ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            
+            echo "Deployment complete! Check http://${{ secrets.EC2_HOST }}/"
